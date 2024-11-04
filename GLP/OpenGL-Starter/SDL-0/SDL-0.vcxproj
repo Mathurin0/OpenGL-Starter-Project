@@ -84,6 +84,11 @@
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="blinkFragment.shader" />
+    <None Include="simpleFragment.shader" />
+    <None Include="simpleVertex.shader" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
