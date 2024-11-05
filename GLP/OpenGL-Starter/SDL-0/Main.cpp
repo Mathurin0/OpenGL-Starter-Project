@@ -1,6 +1,7 @@
 ﻿#include <iostream>
 #include <fstream>
 #include <string>
+#include <vector>
 #include <SDL.h>
 #include <glew.h>
 using namespace std;
@@ -98,6 +99,14 @@ int main(int argc, char* argv[])
 	-0.05f, 0.05f, 0.0f,
 	};
 
+	vector<float> chunksDirections = {
+		0.0f, 0.5f,
+	};
+
+	vector<float> chunksPositions = {
+		0.0f, 0.0f, 0.0f
+	};
+
 	// VAO
 	unsigned int vao;
 	glGenBuffers(1, &vao);
@@ -175,10 +184,8 @@ int main(int argc, char* argv[])
 			newAppleNeeded = false;
 		}
 
-		int appleOffsetXLocation = glGetUniformLocation(appleShaderProgram, "offsetX");
-		glUniform1f(appleOffsetXLocation, appleOffsetX);
-		int appleOffsetYLocation = glGetUniformLocation(appleShaderProgram, "offsetY");
-		glUniform1f(appleOffsetYLocation, appleOffsetY);
+		int appleOffsetLocation = glGetUniformLocation(appleShaderProgram, "offset");
+		glUniform2f(appleOffsetLocation, appleOffsetX, appleOffsetY);
 
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
@@ -189,29 +196,83 @@ int main(int argc, char* argv[])
 
 		// X Offset
 		snakeOffsetX += deltaTime * snakeSpeedX;
-		if (snakeOffsetX >= 0.95 || snakeOffsetX <= -0.95f)
-		{
-			std::cout << "you died" << std::endl;
-		}
-		int offsetXLocation = glGetUniformLocation(snakeShaderProgram, "offsetX");
-		glUniform1f(offsetXLocation, snakeOffsetX);
+		chunksPositions[0] = snakeOffsetX;
 
 		// Y Offset
 		snakeOffsetY += deltaTime * snakeSpeedY;
-		if (snakeOffsetY >= 0.95 || snakeOffsetY <= -0.95f) 
+		chunksPositions[1] = snakeOffsetY;
+		if (snakeOffsetY >= 0.95 || snakeOffsetY <= -0.95f || snakeOffsetX >= 0.95 || snakeOffsetX <= -0.95f)
 		{
-			std::cout << "you died" << std::endl;
+			isRunning = false;
 		}
-		int offsetYLocation = glGetUniformLocation(snakeShaderProgram, "offsetY");
-		glUniform1f(offsetYLocation, snakeOffsetY);
 
 		if (abs(snakeOffsetX - appleOffsetX) < 0.1f && abs(snakeOffsetY - appleOffsetY) < 0.1f)
 		{
 			newAppleNeeded = true;
+
+			int lastPosition = chunksPositions.size() - 1;
+			chunksPositions.push_back(chunksPositions[lastPosition - 2] + (-snakeSpeedX) / 5);
+			chunksPositions.push_back(chunksPositions[lastPosition - 1] + (-snakeSpeedY) / 5);
+			chunksPositions.push_back(0.0f);
+			int lastDirection = chunksDirections.size() - 1;
+			chunksDirections.push_back(chunksDirections[lastDirection - 1]);
+			chunksDirections.push_back(chunksDirections[lastDirection]);
 		}
 
-		glBindVertexArray(vao);
+		int offsetLocation = glGetUniformLocation(snakeShaderProgram, "offset");
+		glUniform2f(offsetLocation, snakeOffsetX, snakeOffsetY);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+		for (int i = 0; i < chunksDirections.size() / 2; i++)
+		{
+			if (i == 0)
+			{
+				chunksDirections[i] = snakeSpeedX;
+				chunksDirections[i + 1] = snakeSpeedY;
+			}
+			else
+			{
+				if (chunksDirections[i * 2] != 0 && chunksDirections[i * 2 - 2] == 0)
+				{
+					std::cout << "turn to move y" << std::endl;
+					if (abs(chunksPositions[i * 3 + 1] - chunksPositions[i * 3 - 2]) <= 0.03f) {
+						chunksPositions[i * 3] = chunksPositions[i * 3 - 3];
+						chunksPositions[i * 3 + 1] = chunksPositions[i * 3 - 2] - snakeSpeedY / 5;
+						chunksDirections[i * 2] = chunksDirections[i * 2 - 2];
+						chunksDirections[i * 2 + 1] = chunksDirections[i * 2 - 1];
+					}
+				}
+				if (chunksDirections[i * 2 + 1] != 0 && chunksDirections[i * 2 - 1] == 0)
+				{
+					std::cout << "turn to move x" << std::endl;
+					if (abs(chunksPositions[i * 3] - chunksPositions[i * 3 - 3]) <= 0.03f) {
+						chunksPositions[i * 3] = chunksPositions[i * 3 - 3] - snakeSpeedX / 5;
+						chunksPositions[i * 3 + 1] = chunksPositions[i * 3 - 2];
+						chunksDirections[i * 2] = chunksDirections[i * 2 - 2];
+						chunksDirections[i * 2 + 1] = chunksDirections[i * 2 - 1];
+					}
+				}
+
+				chunksPositions[i * 3] += deltaTime * chunksDirections[i * 2];
+				chunksPositions[i * 3 + 1] += deltaTime * chunksDirections[i * 2 + 1];
+
+				glUniform2f(offsetLocation, chunksPositions[i * 3], chunksPositions[i * 3 + 1]);
+				glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+			}
+
+			for (int i = 0; i < chunksDirections.size() / 2; i++)
+			{
+				if (i != 0)
+				{
+					std::cout << "x : " << chunksPositions[i * 3] << " / y : " << chunksPositions[i * 3 + 1] << std::endl;
+				}
+				
+				if (i != 0 && abs(snakeOffsetX - chunksPositions[i * 3]) < 0.01f && abs(snakeOffsetY - chunksPositions[i * 3 + 1]) < 0.01f)
+				{
+					isRunning = false;
+				}
+			}
+		}
 
 		SDL_GL_SwapWindow(Window); // Swapbuffer
 	}
