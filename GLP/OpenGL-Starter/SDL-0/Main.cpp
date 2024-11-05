@@ -22,8 +22,8 @@ int main(int argc, char* argv[])
 
 	// --------SETTING UP SDL--------
 	//Create a simple window
-	int width = 400;
-	int height = 300;
+	int width = 1080;
+	int height = 1080;
 	unsigned int center = SDL_WINDOWPOS_CENTERED;
 	SDL_Window* Window = SDL_CreateWindow("My window", center, center, width, height, SDL_WINDOW_OPENGL);
 
@@ -68,14 +68,56 @@ int main(int argc, char* argv[])
 	glAttachShader(shaderProgram, fragmentShader);
 	glLinkProgram(shaderProgram);
 	glUseProgram(shaderProgram);
+
+	// Static Shader
+	vertexShaderString = LoadShader("staticVertex.shader");
+	fragmentShaderString = LoadShader("blinkFragment.shader");
+
+	const char* staticVertexShaderSource = vertexShaderString.c_str();
+	const char* blinkFragmentShaderSource = fragmentShaderString.c_str();
+
+	unsigned int staticVertexShader;
+	staticVertexShader = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(staticVertexShader, 1, &staticVertexShaderSource, NULL);
+	glCompileShader(staticVertexShader);
+
+	unsigned int blinkFragmentShader;
+	blinkFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(blinkFragmentShader, 1, &blinkFragmentShaderSource, NULL);
+	glCompileShader(blinkFragmentShader);
+
+	unsigned int staticShaderProgram;
+	staticShaderProgram = glCreateProgram();
+	glAttachShader(staticShaderProgram, staticVertexShader);
+	glAttachShader(staticShaderProgram, blinkFragmentShader);
+	glLinkProgram(staticShaderProgram);
+	glUseProgram(staticShaderProgram);
+
 	
 
 	// ---------Datas------------
 	// Vertices
 	float vertices[] = {
-	-0.5f, -0.5f, 0.0f,		1.0f, 0.0f, 0.0f,
-	 0.5f, -0.5f, 0.0f,		0.0f, 1.0f, 0.0f,
-	 0.0f,  0.5f, 0.0f,		0.0f, 0.0f, 1.0f
+	// Top
+	0.0f, 0.3f, 0.0f,		0.969f, 1.0f, 0.459f,
+	-1.0f, 0.4f, 0.0f,		1.0f, 0.82f, 0.463f,
+	-0.6f, 0.0f, 0.0f,		0.459f, 1.0f, 0.463f,
+	0.6f, 0.0f, 0.0f,		0.459f, 0.808f, 1.0f,
+	1.0f, 0.4f, 0.0f,		1.0f, 0.459f, 0.992f,
+	// Bottom
+	0.0f, -0.2f, 0.0f,		0.969f, 1.0f, 0.459f,
+	-0.1f, -0.6f, 0.0f,		1.0f, 0.82f, 0.463f,
+	-0.3f, -0.4f, 0.0f,		0.459f, 1.0f, 0.463f,
+	-0.4f, 0.0f, 0.0f,		0.459f, 0.808f, 1.0f,
+	0.4f, 0.0f, 0.0f,		1.0f, 0.459f, 0.992f,
+	0.3f, -0.4f, 0.0f,		0.459f, 1.0f, 0.98f,
+	0.1f, -0.6f, 0.0f,		1.0f, 0.459f, 0.459f,
+
+	// Square
+	0.5f, 0.5f,-1.0f,		0.0f, 0.0f, 1.0f,
+	0.5f, -0.5f, -1.0f,		1.0f, 0.0f, 0.0f,
+	-0.5f, -0.5f, -1.0f,	0.0f, 1.0f, 0.0f,
+	-0.5f, 0.5f, -1.0f,		1.0f, 1.0f, 1.0f,
 	};
 
 	// VAO
@@ -94,6 +136,13 @@ int main(int argc, char* argv[])
 
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
+
+	float offsetX = 0.0f;
+	float offsetY = 0.0f;
+	float speedX = 0.5f;
+	float speedY = 0.5f;
+	float lastTime = 0.0f;
+	float deltaTime;
 	
 	bool isRunning = true;
 	while (isRunning)
@@ -111,6 +160,9 @@ int main(int argc, char* argv[])
 		}
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the screen
 
+		glUseProgram(staticShaderProgram);
+		glDrawArrays(GL_TRIANGLE_FAN, 12, 4);
+
 		glUseProgram(shaderProgram);
 
 		// Change Color over Time
@@ -121,15 +173,30 @@ int main(int argc, char* argv[])
 		int colorLocation = glGetUniformLocation(shaderProgram, "shift");
 		glUniform3f(colorLocation, redValue, greenValue, blueValue);*/
 
-		float speed = 5.0f;
-		float timeValue = ((float)SDL_GetTicks() / 1000);
-		speed += (sin(timeValue) * speed / 2);
-		float offset = (sin(timeValue * speed) / 2.0f);
-		int offsetLocation = glGetUniformLocation(shaderProgram, "offset");
-		glUniform1f(offsetLocation, offset);
+		float timeValue = (float)SDL_GetTicks() / 1000;
+		deltaTime = timeValue - lastTime;
+		lastTime = timeValue;
+
+		// X Offset
+		offsetX += deltaTime * speedX;
+		if (offsetX >= 0.5 || offsetX <= -0.5f)
+		{
+			speedX = -speedX;
+		}
+		int offsetXLocation = glGetUniformLocation(shaderProgram, "offsetX");
+		glUniform1f(offsetXLocation, offsetX);
+
+		// Y Offset
+		offsetY += deltaTime * speedY;
+		if (offsetY >= 0.8 || offsetY <= -0.7f) {
+			speedY = -speedY;
+		}
+		int offsetYLocation = glGetUniformLocation(shaderProgram, "offsetY");
+		glUniform1f(offsetYLocation, offsetY);
 
 		glBindVertexArray(vao);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 5);
+		glDrawArrays(GL_TRIANGLE_FAN, 5, 7);
 
 		SDL_GL_SwapWindow(Window); // Swapbuffer
 	}
